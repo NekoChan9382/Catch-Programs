@@ -1,33 +1,33 @@
-from ultralytics import YOLO
-import cv2
-import serial
-import tkinter as tk
-import threading as th
+from ultralytics import YOLO #type:ignore  画像認識
+import cv2 #type:ignore  importできてるのにエラー吐くため  カメラ画像取得
+import serial  #シリアル通信
+import tkinter as tk  #GUI表示
+import threading as th  #並行処理
 
-cam=cv2.VideoCapture(0)
-ser=serial.Serial("COM3",115200,timeout=2)
-model = YOLO('src\\best.pt')
+cam=cv2.VideoCapture(0)  #カメラ初期化
+ser=serial.Serial("COM8",115200)  #シリアル初期化
+model = YOLO('src\\best.pt')  #学習済モデル
 
-Thread_stop=False
+Thread_stop=False  #プログラム停止フラグ
 
-def yolo():
+def yolo():  #画像認識
 
     while not Thread_stop:
 
-        ret, frame = cam.read()
-        if not ret:
+        ret, frame = cam.read()  #カメラ情報の取得
+        if not ret:  #読み込み失敗時
             break
 
-        results = model.predict(frame,conf=0.8)
+        results = model.predict(frame,conf=0.8)  #画像認識本体
 
-        for r in results:
-            boxes = r.boxes
+        for r in results:  #結果整理
+            boxes = r.boxes  #結果取得
             cls =[]
             for box in boxes:
                 
                 cls.append(box.cls.item()) #0 ebi 1 nori 2 yuzu
             
-            if len(cls)==1:
+            if len(cls)==1:  #結果エコー
                 if cls[0]==0:
                     print("ebi")
                     ser.write(b"1\0")
@@ -40,19 +40,19 @@ def yolo():
 
 def ser_read():
     while not Thread_stop:
-        reads=ser.readline()
-        gui.ser_read(reads.decode())
+        reads=ser.readline()  #シリアル受信
+        gui.ser_read(reads.decode())  #GUI上に反映
         print(reads.decode())
 
-class Serials:
+class Serials:  #GUI
 
 
 
-    def __init__(self,master,ser):
-        self.ser=ser
-        self.master=master
+    def __init__(self,master,ser):  #initialize
+        self.ser=ser  #シリアルのやつ
+        self.master=master  #tkのマスターウィンドウ
 
-        send1=tk.Button(master,text="1を送信",command=lambda: self.ser_send("1\0"))
+        send1=tk.Button(master,text="1を送信",command=lambda: self.ser_send("1\0"))  #ボタン作成
         send2=tk.Button(master,text="2を送信",command=lambda: self.ser_send("2\0"))
         send3=tk.Button(master,text="3を送信",command=lambda: self.ser_send("3\0"))
         send1.pack()
@@ -62,29 +62,29 @@ class Serials:
         self.read=tk.Button(master,text="受信")
         self.read.pack()
 
-        self.keys=[]
+        self.keys=[]  #押されているキーを格納
 
-        master.bind("<KeyPress>",self.key_press)
+        master.bind("<KeyPress>",self.key_press)  #キー認識の設定
         master.bind("<KeyRelease>",self.key_release)
 
-    def ser_send(self,send):
-        self.ser.write(send.encode())
+    def ser_send(self,send):  #シリアル送信
+        self.ser.write(send.encode())  
 
-    def key_press(self,event):
+    def key_press(self,event):  #キー押下受信
 
-        if event.keysym not in self.keys:
+        if event.keysym not in self.keys:  #新たに押されたやつだったら
 
             self.keys.append(event.keysym)
             send=event.keysym+"\0"
             self.ser.write(send.encode())
 
-    def key_release(self,event):
+    def key_release(self,event):  #キー離脱受信
 
         send=event.keysym+"0\0"
         self.keys.remove(event.keysym)
         self.ser.write(send.encode())
 
-    def ser_read(self,text):
+    def ser_read(self,text):  #シリアル受信を反映
         
         self.read.config(text=text)
         print(text)
