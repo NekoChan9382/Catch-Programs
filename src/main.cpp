@@ -10,10 +10,12 @@ bool servo_send = false; //サーボ送信フラグ
 CANMessage msg; //CANメッセージ定義
 DigitalOut led(LED1); //LED初期化
 ServoController servoController(can1); //サーボ初期化
+DigitalIn sw(BUTTON1); //スイッチ初期化
 
 int main()
 {
     servoController.servo_can_id = 141; //サーボCANID設定
+    sw.mode(PullUp); //プルアップ設定
 
     while (1)
     {
@@ -122,6 +124,10 @@ int main()
         if (servo_send){
             servoController.run(servo_data, 1);
             servo_send = false;
+        }
+        if (sw.read() == 0)
+        {
+            printf("read\n");
         }
     }
 }

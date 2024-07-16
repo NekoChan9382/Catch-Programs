@@ -5,52 +5,15 @@ import tkinter as tk  #GUI表示
 import threading as th  #並行処理
 
 cam=cv2.VideoCapture(0)  #カメラ初期化
-ser=serial.Serial("COM8",115200)  #シリアル初期化
+ser=serial.Serial("COM3",115200,timeout=2)  #シリアル初期化
 model = YOLO('src\\best.pt')  #学習済モデル
 
-Thread_stop=False  #プログラム停止フラグ
-
-def yolo():  #画像認識
-
-    while not Thread_stop:
-
-        ret, frame = cam.read()  #カメラ情報の取得
-        if not ret:  #読み込み失敗時
-            break
-
-        results = model.predict(frame,conf=0.8)  #画像認識本体
-
-        for r in results:  #結果整理
-            boxes = r.boxes  #結果取得
-            cls =[]
-            for box in boxes:
-                
-                cls.append(box.cls.item()) #0 ebi 1 nori 2 yuzu
-            
-            if len(cls)==1:  #結果エコー
-                if cls[0]==0:
-                    
-                    ser.write(b"1\0")
-                elif cls[0]==1:
-
-                    ser.write(b"2\0")
-                elif cls[0]==2:
-
-                    ser.write(b"3\0")
-
-def ser_read():
-    while not Thread_stop:
-        reads=ser.readline()  #シリアル受信
-        gui.ser_read(reads.decode())  #GUI上に反映
-        print(reads.decode())
-
 class Serials:  #GUI
-
-
 
     def __init__(self,master,ser):  #initialize
         self.ser=ser  #シリアルのやつ
         self.master=master  #tkのマスターウィンドウ
+        self.Thread_stop=False  #プログラム停止フラグ
 
         send1=tk.Button(master,text="1を送信",command=lambda: self.ser_send("1\0"))  #ボタン作成
         send2=tk.Button(master,text="2を送信",command=lambda: self.ser_send("2\0"))
@@ -84,16 +47,56 @@ class Serials:  #GUI
         self.keys.remove(event.keysym)
         self.ser.write(send.encode())
 
-    def ser_read(self,text):  #シリアル受信を反映
+    def read_show(self,text):  #シリアル受信を反映
         
         self.read.config(text=text)
+
+    def yolo(self):  #画像認識
+
+        while not self.Thread_stop:
+
+            ret, frame = cam.read()  #カメラ情報の取得
+            if not ret:  #読み込み失敗時
+                print("failed")
+                break
+
+            results = model.predict(frame,conf=0.8)  #画像認識本体
+
+            for r in results:  #結果整理
+                boxes = r.boxes  #結果取得
+                self.cls =[-1]
+                for box in boxes:
+                    
+                    self.cls.insert(0,box.cls.item()) #0 ebi 1 nori 2 yuzu
+                
+                if len(self.cls)==2:  #結果エコー
+                    if self.cls[0]==0:
+
+                        self.ser.write(b"1\0")
+                    elif self.cls[0]==1:
+
+                        self.ser.write(b"2\0")
+                    elif self.cls[0]==2:
+
+                        self.ser.write(b"3\0")
+
+    def ser_read(self):
+
+        while not self.Thread_stop:
+            reads=self.ser.readline().strip().decode()  #シリアル受信
+            self.read_show(reads)  #GUI上に反映
+            if reads=="quit":
+                self.Thread_stop=True
+                break
+            if reads=="read":
+                print(self.cls[0])
 
 
 root=tk.Tk()
 gui=Serials(root,ser)
-yolo_th=th.Thread(target=yolo)
+yolo_th=th.Thread(target=gui.yolo)
 yolo_th.start()
-read_th=th.Thread(target=ser_read)
+read_th=th.Thread(target=gui.ser_read)
 read_th.start()
 root.mainloop()
-Thread_stop=True
+gui.Thread_stop=True
