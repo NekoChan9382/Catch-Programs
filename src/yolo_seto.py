@@ -29,13 +29,13 @@ def yolo():  #画像認識
             
             if len(cls)==1:  #結果エコー
                 if cls[0]==0:
-                    print("ebi")
+                    
                     ser.write(b"1\0")
                 elif cls[0]==1:
-                    print("nori")
+
                     ser.write(b"2\0")
                 elif cls[0]==2:
-                    print("yuzu")
+
                     ser.write(b"3\0")
 
 def ser_read():
@@ -87,7 +87,6 @@ class Serials:  #GUI
     def ser_read(self,text):  #シリアル受信を反映
         
         self.read.config(text=text)
-        print(text)
 
 
 root=tk.Tk()
