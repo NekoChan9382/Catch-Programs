@@ -49,7 +49,8 @@ class Serials:  #GUI
 
     def read_show(self,text):  #シリアル受信を反映
         
-        self.read.config(text=text)
+        if text!="":
+            self.read.config(text=text)
 
     def yolo(self):  #画像認識
 
