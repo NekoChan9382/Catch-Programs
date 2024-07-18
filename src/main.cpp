@@ -6,23 +6,37 @@ CAN can1(PA_11, PA_12, (int)1e6); //CAN初期化
 BufferedSerial serial(USBTX, USBRX, 115200); //シリアル初期化
 int16_t output[4] = {0, 0, 0, 0}; //CAN送信データ
 uint8_t servo_data[8]={0}; //サーボ制御用データ
-bool servo_send = false; //サーボ送信フラグ
 CANMessage msg; //CANメッセージ定義
 DigitalOut led(LED1); //LED初期化
 ServoController servoController(can1); //サーボ初期化
 DigitalIn sw(BUTTON1); //スイッチ初期化
 
+uint8_t seto_catched[6][3]={0};
+
+int sort(int seto_kind)
+{
+    for (int i = 0; i < 6; i++)
+    {
+        if (seto_catched[i][seto_kind]<3)
+        {
+            seto_catched[i][seto_kind]++;
+            return i;
+        }
+    }
+    return -1;
+}
+
 int main()
 {
+    bool servo_send = false; //サーボ送信フラグ
     servoController.servo_can_id = 141; //サーボCANID設定
     sw.mode(PullUp); //プルアップ設定
 
     while (1)
     {
-        //serial.write("ebi", sizeof("ebi")); シリアル送信
-        
-        // int deg;
+
         int8_t CAN_Send; //CAN送信データ保存
+        int sort_res=-1; //ソート結果保存
 
 
         if (serial.readable())
@@ -71,27 +85,28 @@ int main()
             {
                 CAN_Send = 3;
             }
-            else if (strcmp(data, "1\0") == 0){
+            else if (strcmp(data, "0\0") == 0){
                 servo_data[1] = 0;
                 servo_send=true;
-                printf("ebi");
+                sort_res=sort(0);
 
 
             }
-            else if (strcmp(data, "2\0") == 0){
+            else if (strcmp(data, "1\0") == 0){
                 servo_data[1] = 128;
                 servo_send=true;
-                printf("nori");
+                sort_res=sort(1);
             }
-            else if (strcmp(data, "3\0") == 0){
+            else if (strcmp(data, "2\0") == 0){
                 servo_data[1] = 255;
                 servo_send=true;
-                printf("yuzu");
+                sort_res=sort(2);
             }
             else
             {
                 output[0] = 0;
             }
+            printf("%d\n",sort_res);
         }//受信データを送信データに整理
         if (CAN_Send == 1)
         {
@@ -128,6 +143,10 @@ int main()
         if (sw.read() == 0)
         {
             printf("read\n");
+            while (not sw.read())
+            {
+                ThisThread::sleep_for(100ms);
+            }
         }
     }
 }
