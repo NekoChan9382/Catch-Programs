@@ -14,6 +14,7 @@ class Serials:  #GUI
         self.ser=ser  #シリアルのやつ
         self.master=master  #tkのマスターウィンドウ
         self.Thread_stop=False  #プログラム停止フラグ
+        self.yolo_res=-1  #画像認識結果
 
         send1=tk.Button(master,text="1を送信",command=lambda: self.ser_send("1\0"))  #ボタン作成
         send2=tk.Button(master,text="2を送信",command=lambda: self.ser_send("2\0"))
@@ -71,15 +72,9 @@ class Serials:  #GUI
                     self.cls.insert(0,box.cls.item()) #0 ebi 1 nori 2 yuzu
                 
                 if len(self.cls)==2:  #結果エコー
-                    if self.cls[0]==0:
-
-                        self.ser.write(b"1\0")
-                    elif self.cls[0]==1:
-
-                        self.ser.write(b"2\0")
-                    elif self.cls[0]==2:
-
-                        self.ser.write(b"3\0")
+                    self.yolo_res=int(self.cls[0])
+                else:
+                    self.yolo_res=-1
 
     def ser_read(self):
 
@@ -91,6 +86,7 @@ class Serials:  #GUI
                 break
             if reads=="read":
                 print(self.cls[0])
+                self.ser.write((str(self.yolo_res)+"\0").encode())
 
 
 root=tk.Tk()
