@@ -53,15 +53,6 @@ int main()
 
             }
 
-            //データ処理
-            /*if (strcmp(data, "10\0") == 0)
-            {
-                output[0] = 8000;
-            }
-            else if (strcmp(data, "11\0") == 0)
-            {
-                output[0] = -8000;
-            }*/
             if (strcmp(data, "w\0") == 0)
             {
                 CAN_Send = 1;
