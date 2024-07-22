@@ -29,7 +29,7 @@ int sort(int seto_kind)
 int main()
 {
     bool servo_send = false; //サーボ送信フラグ
-    servoController.servo_can_id = 141; //サーボCANID設定
+
     sw.mode(PullUp); //プルアップ設定
 
     while (1)
