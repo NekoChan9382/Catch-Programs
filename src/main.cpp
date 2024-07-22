@@ -8,7 +8,7 @@ int16_t output[4] = {0, 0, 0, 0}; //CAN送信データ
 uint8_t servo_data[8]={0}; //サーボ制御用データ
 CANMessage msg; //CANメッセージ定義
 DigitalOut led(LED1); //LED初期化
-ServoController servoController(can1); //サーボ初期化
+ServoController servoController(can1,141); //サーボ初期化
 DigitalIn sw(BUTTON1); //スイッチ初期化
 
 uint8_t seto_catched[6][3]={0};

@@ -3,10 +3,9 @@
 
 // サーボ制御用データの宣言
 extern uint8_t servo1_data[8];
-uint32_t servo_can_id = 141;
 
 // ServoController クラスのコンストラクタ
-ServoController::ServoController(CAN& can) : can(can)
+ServoController::ServoController(CAN& can, uint32_t canid) : can(can), servo_can_id(canid)
 {
   // コンストラクタの実装
   // servo1_data 配列を初期化
