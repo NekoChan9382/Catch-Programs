@@ -5,7 +5,7 @@ import tkinter as tk  #GUI表示
 import threading as th  #並行処理
 
 cam=cv2.VideoCapture(0)  #カメラ初期化
-ser=serial.Serial("COM3",115200,timeout=2)  #シリアル初期化
+ser=serial.Serial("COM8",115200,timeout=2)  #シリアル初期化
 model = YOLO('src\\best.pt')  #学習済モデル
 
 class Serials:  #GUI
