@@ -5,8 +5,8 @@ import tkinter as tk  #GUI表示
 import threading as th  #並行処理
 
 cam=cv2.VideoCapture(0)  #カメラ初期化
-ser=serial.Serial("COM8",115200,timeout=2)  #シリアル初期化
-model = YOLO('src\\best.pt')  #学習済モデル
+ser=serial.Serial("/dev/ttyACM0",115200,timeout=2)  #シリアル初期化
+model = YOLO("src/best.pt")  #学習済モデル
 
 class Serials:  #GUI
 
@@ -15,16 +15,21 @@ class Serials:  #GUI
         self.master=master  #tkのマスターウィンドウ
         self.Thread_stop=False  #プログラム停止フラグ
         self.yolo_res=-1  #画像認識結果
+        font = "Yu Gothic UI"  #フォント設定
 
-        send1=tk.Button(master,text="1を送信",command=lambda: self.ser_send("1\0"))  #ボタン作成
-        send2=tk.Button(master,text="2を送信",command=lambda: self.ser_send("2\0"))
-        send3=tk.Button(master,text="3を送信",command=lambda: self.ser_send("3\0"))
-        send1.pack()
-        send2.pack()
-        send3.pack()
-        
-        self.read=tk.Button(master,text="受信")
-        self.read.pack()
+        self.frame_status=tk.Frame(master,width=1000,height=200,bg=bg)
+        self.frame_read=tk.Frame(master,width=1000,height=30,bg=bg)
+
+        self.frame_status.place(x=30,y=0)
+        self.frame_read.place(x=0,y=570)
+
+        self.status_title=tk.Label(self.frame_status,text="Status",font=(font,15),bg=bg,fg="white")
+        self.status_predict=tk.Label(self.frame_status,text="Predict: ",font=(font,15),bg=bg,fg="white")
+        self.status_title.place(x=30,y=0)
+        self.status_predict.place(x=30,y=30)
+
+        self.raw_read=tk.Label(self.frame_read,text="Serial Data:",font=(font,15),bg=bg,fg="white")
+        self.raw_read.place(x=0,y=0)
 
         self.keys=[]  #押されているキーを格納
 
@@ -51,7 +56,7 @@ class Serials:  #GUI
     def read_show(self,text):  #シリアル受信を反映
         
         if text!="":
-            self.read.config(text=text)
+            self.raw_read.config(text="Serial Data: "+text)
 
     def yolo(self):  #画像認識
 
@@ -73,8 +78,12 @@ class Serials:  #GUI
                 
                 if len(self.cls)==2:  #結果エコー
                     self.yolo_res=int(self.cls[0])
+                    self.status_predict.config(text="Predict: "+str(self.yolo_res).translate(str.maketrans({'0':'ebi','1':'nori','2':'yuzu'})))
                 else:
                     self.yolo_res=-1
+
+            if self.yolo_res != -1:
+                self.ser.write((str(self.yolo_res)+"\0").encode())
 
     def ser_read(self):
 
@@ -88,8 +97,11 @@ class Serials:  #GUI
                 print(self.cls[0])
                 self.ser.write((str(self.yolo_res)+"\0").encode())
 
+bg="#202028"
 
 root=tk.Tk()
+root.geometry("1000x600")
+root.configure(bg=bg)
 gui=Serials(root,ser)
 yolo_th=th.Thread(target=gui.yolo)
 yolo_th.start()
