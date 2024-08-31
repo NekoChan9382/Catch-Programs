@@ -5,11 +5,24 @@
 CAN can1(PA_11, PA_12, (int)1e6); //CAN初期化
 BufferedSerial serial(USBTX, USBRX, 115200); //シリアル初期化
 int16_t output[4] = {0}; //CAN送信データ
-uint8_t servo_data[8]={0}; //サーボ制御用データ
 CANMessage msg; //CANメッセージ定義
 DigitalOut led(LED1); //LED初期化
-ServoController servoController(can1,141); //サーボ初期化
-DigitalIn sw(BUTTON1); //スイッチ初期化
+DigitalIn sw(BUTTON1,PullUp); //スイッチ初期化
+
+AnalogIn CdS_left(PA_4);
+AnalogIn CdS_right(PB_0);
+AnalogIn CdS_forward(PC_1);
+AnalogIn CdS_center(PC_0);
+AnalogIn CdS_back(PC_2);
+AnalogIn CdS_first(PC_3);
+AnalogIn CdS_belt(PC_4);
+
+DigitalOut LED_vertic(PB_2);
+DigitalOut LED_belt(PB_1);
+DigitalOut LED_horizon(PB_15);
+
+PwmOut big_belt(PA_0);
+PwmOut small_belt(PA_1);
 
 uint8_t seto_catched[6][3]={0};
 
@@ -28,9 +41,6 @@ int sort(int seto_kind)
 
 int main()
 {
-    bool servo_send = false; //サーボ送信フラグ
-
-    sw.mode(PullUp); //プルアップ設定
 
     while (1)
     {
@@ -77,20 +87,17 @@ int main()
                 CAN_Send = 3;
             }
             else if (strcmp(data, "0\0") == 0){
-                servo_data[1] = 0;
-                servo_send=true;
+
                 sort_res=sort(0);
 
 
             }
             else if (strcmp(data, "1\0") == 0){
-                servo_data[1] = 128;
-                servo_send=true;
+
                 sort_res=sort(1);
             }
             else if (strcmp(data, "2\0") == 0){
-                servo_data[1] = 255;
-                servo_send=true;
+
                 sort_res=sort(2);
             }
             else
@@ -127,17 +134,6 @@ int main()
         }
         CANMessage msg(4, (const uint8_t *)output, 8); //メッセージ構築
         can1.write(msg); //CAN送信
-        if (servo_send){
-            servoController.run(servo_data, 1);
-            servo_send = false;
-        }
-        if (sw.read() == 0)
-        {
-            printf("read\n");
-            while (not sw.read())
-            {
-                ThisThread::sleep_for(100ms);
-            }
-        }
+        
     }
 }
