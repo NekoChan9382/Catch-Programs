@@ -308,9 +308,9 @@ int main()
                 if (strcmp(data, "case\0") == 0)
                 {
                     int upload[3] = {0};
-                    serial.read(upload[0], sizeof(upload[0]));
-                    serial.read(upload[1], sizeof(upload[1]));
-                    serial.read(upload[2], sizeof(upload[2]));
+                    serial.read(&upload[0], sizeof(upload[0]));
+                    serial.read(&upload[1], sizeof(upload[1]));
+                    serial.read(&upload[2], sizeof(upload[2]));
 
                     upload[0] -= '0' - 1;
                     upload[1] -= '0';

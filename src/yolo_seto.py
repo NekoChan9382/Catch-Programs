@@ -5,7 +5,7 @@ import tkinter as tk  #GUI表示
 import threading as th  #並行処理
 
 cam=cv2.VideoCapture(0)  #カメラ初期化
-ser=serial.Serial("/dev/ttyACM0",115200,timeout=2)  #シリアル初期化
+ser=serial.Serial("COM8",115200,timeout=2)  #シリアル初期化
 model = YOLO("src/best.pt")  #学習済モデル
 
 class Serials:  #GUI
@@ -19,9 +19,11 @@ class Serials:  #GUI
 
         self.frame_status=tk.Frame(master,width=1000,height=200,bg=bg)
         self.frame_read=tk.Frame(master,width=1000,height=30,bg=bg)
+        self.frame_buttons=tk.Frame(master,width=1000,height=200,bg=bg)
 
         self.frame_status.place(x=30,y=0)
         self.frame_read.place(x=0,y=570)
+        self.frame_buttons.place(x=0,y=200)
 
         self.status_title=tk.Label(self.frame_status,text="Status",font=(font,15),bg=bg,fg="white")
         self.status_predict=tk.Label(self.frame_status,text="Predict: ",font=(font,15),bg=bg,fg="white")
@@ -30,6 +32,9 @@ class Serials:  #GUI
 
         self.raw_read=tk.Label(self.frame_read,text="Serial Data:",font=(font,15),bg=bg,fg="white")
         self.raw_read.place(x=0,y=0)
+
+        self.auto_button=tk.Button(self.frame_buttons,text="自動制御切り替え",font=(font,15),bg=bg,fg="white",command=self.ser_send("auto\0"))
+        self.auto_button.place(x=0,y=0)
 
         self.keys=[]  #押されているキーを格納
 
