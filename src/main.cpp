@@ -2,11 +2,12 @@
 #include "Servo.hpp"
 #include <cstdint>
 
-CAN can1(PA_11, PA_12, (int)1e6);            // CAN初期化
+//CAN can1(PA_11, PA_12, (int)1e6);            // CAN初期化
 BufferedSerial serial(USBTX, USBRX, 115200); // シリアル初期化
 int16_t can_output_1[4] = {0};               // CAN送信データ アーム展開 0:掬い 1:妨害 2:支え 3:掬い上下
 int16_t can_output_2[4] = {0};               // CAN送信データ その他 0:アーム左右 1:LT 2:ベルト前後 3:ベルト左右
-CANMessage msg;                              // CANメッセージ定義
+CANMessage msg1;
+CANMessage msg2;                              // CANメッセージ定義
 DigitalOut led(LED1);                        // LED初期化
 DigitalIn sw(BUTTON1, PullUp);               // スイッチ初期化
 
@@ -30,8 +31,8 @@ uint8_t seto_catched[6][3] = {0};
 float CdS_base[7] = {0.0}; // CdS基準値 0:左 1:右 2:前 3:初期 4:中央 5:後 6:ベルト
 float CdS_now[7] = {0.0};  // CdS現在値 0:左 1:右 2:前 3:初期 4:中央 5:後 6:ベルト
 
-int goal[2] = {0, 2}; // 目標位置情報 x,y
-int pos[2] = {0, 2};  // 位置情報 x,y
+int goal[2] = {0, 1}; // 目標位置情報 x,y
+int pos[2] = {0, 1};  // 位置情報 x,y
 
 bool auto_sort = 0;
 bool big_belt_move = 0;
@@ -42,19 +43,6 @@ bool belt_orientation_horizontal = 0;
 bool wait_belt_move = 0;
 bool at_CdS[2] = {0}; // 0:horizontal 1:vertical
 
-
-int sort(int seto_kind)
-{
-    for (int i = 0; i < 6; i++)
-    {
-        if (seto_catched[i][seto_kind] < 3)
-        {
-            seto_catched[i][seto_kind]++;
-            return i;
-        }
-    }
-    return -1;
-}
 
 void set_goal(int case_num)
 {
@@ -72,17 +60,18 @@ void set_goal(int case_num)
         goal[1] = 6;
         break;
     }
+    printf("goal,%d, %d\n", goal[0], goal[1]);
 }
 
 void CdS_calibrate()
 {
-    CdS_base[0] = CdS_left.read() - 1.0;
+    CdS_base[0] = CdS_left.read() +0.5;
     CdS_base[1] = CdS_right.read() + 0.5;
-    CdS_base[2] = CdS_forward.read() - 1.0;
-    CdS_base[3] = CdS_first.read() - 1.0;
-    CdS_base[4] = CdS_center.read() - 1.0;
-    CdS_base[5] = CdS_back.read() + 0.5;
-    CdS_base[6] = CdS_belt.read() - 1.0;
+    CdS_base[2] = CdS_forward.read() +0.5;
+    CdS_base[3] = CdS_first.read() + 0.5;
+    CdS_base[4] = CdS_center.read() +0.5;
+    CdS_base[5] = CdS_back.read() + 0.1;
+    CdS_base[6] = CdS_belt.read() - 0.1;
 }
 
 void CdS_read()
@@ -103,7 +92,7 @@ void CdS_pos_read(bool prev_at_CdS_horizontal, bool prev_at_CdS_vertical)
 
     for (int i = 0; i < 2; i++) // x座標取得
     {
-        if (CdS_now[i] < CdS_base[i])
+        if (CdS_now[i] > CdS_base[i])
         {
             pos[0] = i * 2;
             at_CdS[0] = 1;
@@ -112,7 +101,7 @@ void CdS_pos_read(bool prev_at_CdS_horizontal, bool prev_at_CdS_vertical)
 
     for (int i = 2; i < 6; i++) // y座標取得
     {
-        if (CdS_now[i] < CdS_base[i])
+        if (CdS_now[i] > CdS_base[i])
         {   
             pos[1] = (i - 2) * 2;
             at_CdS[1] = 1;
@@ -130,7 +119,7 @@ void CdS_pos_read(bool prev_at_CdS_horizontal, bool prev_at_CdS_vertical)
         }
     }
 
-    if (prev_at_CdS_horizontal && !at_CdS[1])
+    if (prev_at_CdS_vertical && !at_CdS[1])
     {
         if (belt_orientation_vertical)
         {
@@ -141,7 +130,33 @@ void CdS_pos_read(bool prev_at_CdS_horizontal, bool prev_at_CdS_vertical)
             pos[1]--;
         }
     }
+    printf("pos,%d, %d\n", pos[0], pos[1]);
 }
+
+void send_case_data()
+{
+    printf("send_case\n");
+    for (int i = 0; i < 6; i++)
+    {
+        for (int j = 0; j < 3; j++)
+        {
+            printf("%d\n", seto_catched[i][j]);
+        }
+    }
+}
+
+int sort(int seto_kind)
+{
+    for (int i = 0; i < 6; i++)
+    {
+        if (seto_catched[i][seto_kind] < 3)
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
 
 int main()
 {
@@ -152,12 +167,14 @@ int main()
     CdS_calibrate();
     small_belt = 0.1;
     big_belt = 0.1;
+    printf("auto,0\n");
+    int sort_res = -1; // ソート結果保存
+    int detect_seto_kind = -1;
 
     while (1)
     {
 
         int8_t CAN_Send;   // CAN送信データ保存
-        int sort_res = -1; // ソート結果保存
 
         if (serial.readable())
         {
@@ -250,26 +267,37 @@ int main()
                 can_output_1[1] = 0;
             }
 
+            else if (strcmp(data, "auto\0") == 0)
+                {
+                    auto_sort = !auto_sort;
+                    printf("auto,%d\n", auto_sort);
+                }
+
             if (auto_sort) // 自動仕分けモード時
             {
+                if (!wait_belt_move){
 
-                if (strcmp(data, "0\0") == 0)
-                { // えび検知
+                    if (strcmp(data, "0\0") == 0)
+                    { // えび検知
 
-                    sort_res = sort(0) + 1;
-                    detect_seto = 1;
-                }
-                else if (strcmp(data, "1\0") == 0)
-                { // のり検知
+                        sort_res = sort(0);
+                        detect_seto = 1;
+                        detect_seto_kind = 0;
+                    }
+                    else if (strcmp(data, "1\0") == 0)
+                    { // のり検知
 
-                    sort_res = sort(1) + 1;
-                    detect_seto = 1;
-                }
-                else if (strcmp(data, "2\0") == 0)
-                { // ゆず検知
+                        sort_res = sort(1);
+                        detect_seto = 1;
+                        detect_seto_kind = 1;
+                    }
+                    else if (strcmp(data, "2\0") == 0)
+                    { // ゆず検知
 
-                    sort_res = sort(2) + 1;
-                    detect_seto = 1;
+                        sort_res = sort(2);
+                        detect_seto = 1;
+                        detect_seto_kind = 2;
+                    }
                 }
             }
             else // 手動仕分けモード時
@@ -300,11 +328,7 @@ int main()
                     can_output_1[2] = 0;
                 }
 
-                if (strcmp(data, "auto\0") == 0)
-                {
-                    auto_sort = !auto_sort;
-                    printf("auto, %d\n", auto_sort);
-                }
+                
                 if (strcmp(data, "case\0") == 0)
                 {
                     int upload[3] = {0};
@@ -317,10 +341,11 @@ int main()
                     upload[2] -= '0';
 
                     seto_catched[upload[0]][upload[1]] = upload[2];
+                    send_case_data();
                 }
             }
 
-            printf("%d\n", sort_res);
+            //printf("%d\n", sort_res);
         } // 受信データを送信データに整理
 
         if (auto_sort)
@@ -336,11 +361,15 @@ int main()
             {
                 small_belt = 0.0;
                 big_belt = 0.0;
-                set_goal(sort_res);
-                belt_orientation_horizontal = (goal[0] > pos[0]);
-                belt_orientation_vertical = (goal[1] > pos[1]);
+                set_goal(sort_res +1);
                 wait_belt_move = 1;
+                detect_seto = 0;
+                printf("stop,1\n");
             }
+
+            belt_orientation_horizontal = (goal[0] > pos[0]);
+            belt_orientation_vertical = (goal[1] > pos[1]);
+
             if (goal[0] != pos[0])
             {
                 if (belt_orientation_horizontal)
@@ -353,7 +382,7 @@ int main()
                 }
             }
             else
-            {
+            { 
                 can_output_2[3] = 0;
             }
 
@@ -376,13 +405,17 @@ int main()
             {
                 small_belt = 0.1;
                 big_belt = 0.1;
+                wait_belt_move = 0;
+                ++seto_catched[sort_res][detect_seto_kind];
+                send_case_data();
+                printf("stop,0\n");
             }
 
         }
 
-        CANMessage msg(4, (const uint8_t *)can_output_1, 8); // メッセージ構築
-        CANMessage msg(1, (const uint8_t *)can_output_2, 8); // メッセージ構築
+        CANMessage msg1(4, (const uint8_t *)can_output_1, 8); // メッセージ構築
+        CANMessage msg2(1, (const uint8_t *)can_output_2, 8); // メッセージ構築
 
-        can1.write(msg); // CAN送信
+        //can1.write(msg1); // CAN送信
     }
 }

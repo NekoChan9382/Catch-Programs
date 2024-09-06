@@ -3,9 +3,10 @@ import cv2 #type:ignore  importできてるのにエラー吐くため  カメ�
 import serial  #シリアル通信
 import tkinter as tk  #GUI表示
 import threading as th  #並行処理
+import numpy as np  #配列処理
 
 cam=cv2.VideoCapture(0)  #カメラ初期化
-ser=serial.Serial("COM8",115200,timeout=2)  #シリアル初期化
+ser=serial.Serial("/dev/ttyACM0",115200,timeout=2)  #シリアル初期化
 model = YOLO("src/best.pt")  #学習済モデル
 
 class Serials:  #GUI
@@ -33,10 +34,21 @@ class Serials:  #GUI
         self.raw_read=tk.Label(self.frame_read,text="Serial Data:",font=(font,15),bg=bg,fg="white")
         self.raw_read.place(x=0,y=0)
 
-        self.auto_button=tk.Button(self.frame_buttons,text="自動制御切り替え",font=(font,15),bg=bg,fg="white",command=self.ser_send("auto\0"))
+        self.test=tk.Label(self.frame_status,text="pos: ",font=(font,15),bg=bg,fg="white")
+        self.test.place(x=30,y=60)
+
+        self.goal=tk.Label(self.frame_status,text="goal: ",font=(font,15),bg=bg,fg="white")
+        self.goal.place(x=30,y=90)
+
+        self.auto_button=tk.Button(self.frame_buttons,text="自動制御切り替え: OFF",font=(font,15),bg=bg,fg="white",command=lambda: self.ser_send("auto\0"))
         self.auto_button.place(x=0,y=0)
 
         self.keys=[]  #押されているキーを格納
+
+        self.case_seto_data = np.zeros((6,3),dtype=int)  #ケースのセット状況
+        self.belt_pos = [0,2]
+        self.stop_predict=False
+        self.auto_move=False
 
         master.bind("<KeyPress>",self.key_press)  #キー認識の設定
         master.bind("<KeyRelease>",self.key_release)
@@ -73,34 +85,66 @@ class Serials:  #GUI
                 break
 
             results = model.predict(frame,conf=0.8)  #画像認識本体
-
-            for r in results:  #結果整理
-                boxes = r.boxes  #結果取得
-                self.cls =[-1]
-                for box in boxes:
-                    
-                    self.cls.insert(0,box.cls.item()) #0 ebi 1 nori 2 yuzu
+            
+            if (not self.stop_predict) & self.auto_move:  #自動制御時
                 
-                if len(self.cls)==2:  #結果エコー
-                    self.yolo_res=int(self.cls[0])
-                    self.status_predict.config(text="Predict: "+str(self.yolo_res).translate(str.maketrans({'0':'ebi','1':'nori','2':'yuzu'})))
-                else:
-                    self.yolo_res=-1
+                for r in results:  #結果整理
+                    boxes = r.boxes  #結果取得
+                    self.cls =[-1]
+                    for box in boxes:
+                        
+                        self.cls.insert(0,box.cls.item()) #0 ebi 1 nori 2 yuzu
+                    
+                    if len(self.cls)==2:  #結果エコー
+                        self.yolo_res=int(self.cls[0])
+                        self.status_predict.config(text="Predict: "+str(self.yolo_res).translate(str.maketrans({'0':'ebi','1':'nori','2':'yuzu'})))
+                    else:
+                        self.yolo_res=-1
 
-            if self.yolo_res != -1:
-                self.ser.write((str(self.yolo_res)+"\0").encode())
+                if self.yolo_res != -1:
+                    self.ser.write((str(self.yolo_res)+"\0").encode())
+
+                print(self.case_seto_data)
 
     def ser_read(self):
 
         while not self.Thread_stop:
-            reads=self.ser.readline().strip().decode()  #シリアル受信
-            self.read_show(reads)  #GUI上に反映
-            if reads=="quit":
-                self.Thread_stop=True
-                break
-            if reads=="read":
-                print(self.cls[0])
-                self.ser.write((str(self.yolo_res)+"\0").encode())
+                
+                reads=self.ser.readline().strip().decode()  #シリアル受信
+                self.receive_serial_analysis(reads)
+                self.read_show(reads)  #GUI上に反映
+
+    def receive_serial_analysis(self,received):
+
+        received_split=received.split(",")
+        if received_split[0]=="auto":
+            if (received_split[1]=="1"):
+                self.auto_button.config(text="自動制御切り替え: ON")
+                self.auto_move=True
+            else:
+                self.auto_button.config(text="自動制御切り替え: OFF")
+                self.auto_move=False
+
+        if received_split[0]=="send_case":
+            i=0
+            j=0
+
+            for i in range(6):
+                for j in range(3):
+                    self.case_seto_data[i][j] = int(self.ser.readline().strip().decode())
+
+        if received_split[0]=="pos":
+            self.belt_pos[0] = int(received_split[1])
+            self.belt_pos[1] = int(received_split[2])
+            self.test.config(text="pos: "+str(self.belt_pos[0])+","+str(self.belt_pos[1]))
+
+        if received_split[0]=="goal":
+            self.goal.config(text="goal: "+str(received_split[1])+","+str(received_split[2]))
+
+        if received_split[0]=="stop":
+            self.stop_predict=int(received_split[1])
+            if not (int(received_split[1])):
+                self.status_predict.config(text="Predict:")
 
 bg="#202028"
 
