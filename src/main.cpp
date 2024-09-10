@@ -31,8 +31,8 @@ uint8_t seto_catched[6][3] = {0};
 float CdS_base[7] = {0.0}; // CdS基準値 0:左 1:右 2:前 3:初期 4:中央 5:後 6:ベルト
 float CdS_now[7] = {0.0};  // CdS現在値 0:左 1:右 2:前 3:初期 4:中央 5:後 6:ベルト
 
-int goal[2] = {0, 1}; // 目標位置情報 x,y
-int pos[2] = {0, 1};  // 位置情報 x,y
+int goal[2] = {1, 1}; // 目標位置情報 x,y
+int pos[2] = {1, 1};  // 位置情報 x,y
 
 bool auto_sort = 0;
 bool big_belt_move = 0;
@@ -46,7 +46,7 @@ bool at_CdS[2] = {0}; // 0:horizontal 1:vertical
 
 void set_goal(int case_num)
 {
-    goal[0] = case_num / 3;
+    goal[0] = ((case_num - 1) / 3) * 2;
 
     switch (case_num % 3)
     {
@@ -174,15 +174,13 @@ int main()
     while (1)
     {
 
-        int8_t CAN_Send;   // CAN送信データ保存
-
         if (serial.readable())
         {
             int i = 0;       // 繰り返し変数
             char buff = '0'; // シリアル受信
-            char data[5];    // 受信データ保存
+            char data[8];    // 受信データ保存
 
-            while (buff != '\0' and i < 5)
+            while (buff != '\0' and i < 8)
             {
                 serial.read(&buff, sizeof(buff)); // シリアル受信
                 data[i] = buff;                   // 受信データ保存
@@ -275,6 +273,14 @@ int main()
 
             if (auto_sort) // 自動仕分けモード時
             {
+                if (strcmp(data, "shoot\0") == 0)
+                {
+                    printf("shot\n");
+                    big_belt = 0.1;
+                    wait_belt_move = 0;
+                    ++seto_catched[sort_res][detect_seto_kind];
+                    send_case_data();
+                }
                 if (!wait_belt_move){
 
                     if (strcmp(data, "0\0") == 0)
@@ -331,14 +337,14 @@ int main()
                 
                 if (strcmp(data, "case\0") == 0)
                 {
-                    int upload[3] = {0};
-                    serial.read(&upload[0], sizeof(upload[0]));
-                    serial.read(&upload[1], sizeof(upload[1]));
-                    serial.read(&upload[2], sizeof(upload[2]));
+                    char upload[3] = {0};
+                    serial.read(&upload, sizeof(upload));
+                    printf("case,%d,%d,%d\n", upload[0], upload[1], upload[2]);
 
-                    upload[0] -= '0' - 1;
+                    upload[0] -= '0';
                     upload[1] -= '0';
                     upload[2] -= '0';
+                    printf("case,%d,%d,%d\n", upload[0], upload[1], upload[2]);
 
                     seto_catched[upload[0]][upload[1]] = upload[2];
                     send_case_data();
@@ -364,7 +370,7 @@ int main()
                 set_goal(sort_res +1);
                 wait_belt_move = 1;
                 detect_seto = 0;
-                printf("stop,1\n");
+                printf("stop\n");
             }
 
             belt_orientation_horizontal = (goal[0] > pos[0]);
@@ -401,14 +407,10 @@ int main()
             {
                 can_output_2[2] = 0;
             }
-            if (goal[0] == pos[0] && goal[1] == pos[1] && wait_belt_move)
-            {
+            if (goal[0] == pos[0] && goal[1] == pos[1] && wait_belt_move && small_belt == 0.0)
+            {   
+                printf("moved\n");
                 small_belt = 0.1;
-                big_belt = 0.1;
-                wait_belt_move = 0;
-                ++seto_catched[sort_res][detect_seto_kind];
-                send_case_data();
-                printf("stop,0\n");
             }
 
         }
