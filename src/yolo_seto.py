@@ -48,6 +48,9 @@ class Serials:  #GUI
         self.auto_button=tk.Button(self.frame_buttons,text="自動制御開始",font=(font,15),bg=bg,fg="white",command=lambda: self.ser_send("auto\0"))
         self.auto_button.place(x=0,y=0)
 
+        self.back_first_point_button=tk.Button(self.frame_buttons,text="初期地点に戻る",font=(font,15),bg=bg,fg="white",command=self.back_first_point)
+        self.back_first_point_button.place(x=0,y=50)
+
         self.tray_canvas=tk.Canvas(self.frame_tray,width=300,height=570,bg=bg)
         self.tray_canvas.place(x=0,y=0)
 
@@ -77,7 +80,7 @@ class Serials:  #GUI
 
         self.case_seto_data = np.zeros((6,3),dtype=int)  #ケースのセット状況
         self.belt_pos = [0,2]
-        self.stop_predict=False
+        self.stop_predict=True
         self.auto_move=False
         self.between_goal_to_shoot = False
         self.toray_update_select = [0,0,0]
@@ -153,16 +156,18 @@ class Serials:  #GUI
                         self.yolo_res=-1
                         if self.between_goal_to_shoot and self.yolo_conf >= 5:
                             self.ser.write("shoot\0".encode(self.encode))
-                            print("shoot")
                             self.between_goal_to_shoot = False
                             self.stop_predict = False
                             self.yolo_conf = 0
                             self.status_predict.config(text="Predict: ")
+                            self.goal.config(text="goal: ")
                     
 
-                if self.yolo_res != -1 and self.yolo_conf >= 5:
+                if self.yolo_res != -1 and self.yolo_conf >= 5 and not self.between_goal_to_shoot:  #認識結果が確定している場合
                     self.ser.write((str(self.yolo_res)+"\0").encode(self.encode))
                     self.status_predict.config(text="Predict: "+str(self.yolo_res).translate(str.maketrans({'0':'ebi','1':'nori','2':'yuzu'})))
+                    self.stop_predict = True
+                    
 
 
     def ser_read(self):
@@ -181,9 +186,13 @@ class Serials:  #GUI
             if (received_split[1]=="1"):
                 self.auto_button.config(text="自動制御停止")
                 self.auto_move=True
+                self.stop_predict = False
+                self.goal.config(text="goal: ")
+                self.status_predict.config(text="Predict: ")
             else:
                 self.auto_button.config(text="自動制御開始")
                 self.auto_move=False
+                self.stop_predict = True
 
         if received_split[0]=="send_case":
             i=0
@@ -193,7 +202,6 @@ class Serials:  #GUI
                 for j in range(3):
                     self.case_seto_data[i][j] = int(self.ser.readline().strip().decode(self.encode))
                     self.tray_button[i][j].config(text=self.case_seto_data[i][j])
-            print("end\n")
 
         if received_split[0]=="pos":
             self.belt_pos[0] = int(received_split[1])
@@ -222,6 +230,12 @@ class Serials:  #GUI
             else:
                 self.toray_update_select = [0,0,0]
                 self.tray_button[toray][kind].config(fg="white")
+
+    def back_first_point(self):
+        self.ser.write("back\0".encode(self.encode))
+        self.stop_predict = True
+        self.auto_move = False
+        self.between_goal_to_shoot = False
 
 bg="#202028"
 
